@@ -1,6 +1,6 @@
 #
 #FROM centos:latest - some users reported problems with yum
-FROM centos:7
+FROM almalinux:10-kitten
 MAINTAINER Dave Gill <gill@ucar.edu>
 
 ENV WRF_VERSION 4.0.3
@@ -10,18 +10,29 @@ ENV NML_VERSION 4.0.2
 # Set up base OS environment
 
 RUN yum -y update
-RUN yum -y install scl file gcc gcc-gfortran gcc-c++ glibc.i686 libgcc.i686 libpng-devel jasper \
-  jasper-devel hostname m4 make perl tar bash tcsh time wget which zlib zlib-devel \
+RUN yum -y install file gcc gcc-gfortran gcc-c++ libpng-devel jasper \
+  hostname m4 make perl tar bash tcsh time wget which zlib zlib-devel \
   openssh-clients openssh-server net-tools fontconfig libgfortran libXext libXrender \
-  ImageMagick sudo epel-release git
+  sudo epel-release git
+
+ 
+
+# Alternate imagemagick install
+RUN dnf install -y epel-release
+RUN dnf install -y ImageMagick
+
+# working?
+#RUN dnf install -y glibc.i686 
+#RUN dnf -y install jasper-devel
+#RUN dnf -y install libgcc.i686
+#RUN dnf -y install scl
 
 # Newer version of GNU compiler, required for WRF 2003 and 2008 Fortran constructs
 
-RUN yum -y install centos-release-scl \
- && yum -y install devtoolset-8 \
- && yum -y install devtoolset-8-gcc devtoolset-8-gcc-gfortran devtoolset-8-gcc-c++ \
- && scl enable devtoolset-8 bash \
- && scl enable devtoolset-8 tcsh 
+### Seems like this may not be needed with newer version of gcc?
+#RUN yum -y install centos-release-scl \
+#RUN yum -y install devtoolset-8 
+#RUN yum -y install devtoolset-8-gcc devtoolset-8-gcc-gfortran devtoolset-8-gcc-c++ 
 
 RUN groupadd wrf -g 9999
 RUN useradd -u 9999 -g wrf -G wheel -M -d /wrf wrfuser
@@ -34,9 +45,9 @@ ENV J 4
 
 # Build OpenMPI
 RUN mkdir -p /wrf/libs/openmpi/BUILD_DIR
-RUN source /opt/rh/devtoolset-8/enable \
- && cd /wrf/libs/openmpi/BUILD_DIR \
- && curl -L -O https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.0.tar.gz \
+RUN cd /wrf/libs/openmpi/BUILD_DIR \
+ && curl -L -O https://download.open-mpi.org/release/open-mpi/v4.0/openmpi-4.0.0.tar.gz
+RUN cd /wrf/libs/openmpi/BUILD_DIR \
  && tar -xf openmpi-4.0.0.tar.gz \
  && cd openmpi-4.0.0 \
  && ./configure --prefix=/usr/local &> /wrf/libs/build_log_openmpi_config \
@@ -44,24 +55,24 @@ RUN source /opt/rh/devtoolset-8/enable \
  && cd / \
  && rm -rf /wrf/libs/openmpi/BUILD_DIR
 
-# Build HDF5 libraries
-RUN mkdir -p /wrf/libs/hdf5/BUILD_DIR
-RUN source /opt/rh/devtoolset-8/enable \
- && cd /wrf/libs/hdf5/BUILD_DIR \
- && git clone https://bitbucket.hdfgroup.org/scm/hdffv/hdf5.git \
- && cd hdf5 \
- && git checkout hdf5-1_10_4 \
- && ./configure --enable-fortran --enable-cxx --prefix=/usr/local/ &> /wrf/libs/build_log_hdf5_config \
- && make install &> /wrf/libs/build_log_hdf5_make \
- && rm -rf /wrf/libs/hdf5/BUILD_DIR
-ENV LD_LIBRARY_PATH /usr/local/lib
+## Build HDF5 libraries
+#RUN mkdir -p /wrf/libs/hdf5/BUILD_DIR
+#RUN cd /wrf/libs/hdf5/BUILD_DIR \
+# && git clone https://bitbucket.hdfgroup.org/scm/hdffv/hdf5.git
+#RUN cd /wrf/libs/hdf5/BUILD_DIR \
+# && cd hdf5 \
+# && git checkout hdf5-1_10_4 \
+# && ./configure --enable-fortran --enable-cxx --prefix=/usr/local/ &> /wrf/libs/build_log_hdf5_config \
+# && make install &> /wrf/libs/build_log_hdf5_make \
+# && rm -rf /wrf/libs/hdf5/BUILD_DIR
+#ENV LD_LIBRARY_PATH /usr/local/lib
+RUN yum -y install hdf5
 
 # Build netCDF C and Fortran libraries
 RUN yum -y install libcurl-devel zlib-devel
 ENV NETCDF /wrf/libs/netcdf
 RUN mkdir -p ${NETCDF}/BUILD_DIR
-RUN source /opt/rh/devtoolset-8/enable \
- && cd ${NETCDF}/BUILD_DIR \
+RUN cd ${NETCDF}/BUILD_DIR \
  && curl -L -O https://github.com/Unidata/netcdf-c/archive/v4.6.2.tar.gz \
  && curl -L -O https://github.com/Unidata/netcdf-fortran/archive/v4.4.5.tar.gz \
  && tar -xf v4.6.2.tar.gz \
